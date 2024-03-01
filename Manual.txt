@@ -1,0 +1,256 @@
+ROCK PAPER SCISSORS BOT USER MANUAL
+>>Enable "text wrapping" is recommended
+>>for reading this manual.
+This text file is the user manual for rockPaperScissorsBotV1.py. Here you'll find all the functionality the bot offers you as a user. It is highly recommended that you do NOT delete this file.
+
+========================
+RUNNING THE PROGRAM
+This program is intended to be ran from a seperate python script. Just create a python file, import rockPaperScissorsBotV1.py, and call main(). Also make sure you have pytorch installed, as it's a required library. If done correctly, the bot should print "importing", and after a moment, it will bring up the Top menu.
+
+========================
+THE SETTINGS MENUS' INTERFACE
+This program uses a fully text based interface. In each menu, you'll get a paragraph briefly explaining your options, and a set of parameters. The parameter names will have a letter surrounded by parentheses. That letter is the command used to change that particular value. Every command is a single letter, and sometimes you'll have to also give it an argument. For example:
+
+(P)arameter: 100
+Enter your command: P 200
+Parameter = 200
+
+Different parameters may take different inputs, or no input at all. To see which parameters take what, see the manual section on the menu your parameter is in.
+You can also run multiple commands at a time. To do this, write out each command seperated by a comma.
+
+(P)arameter: 100
+(V)ariable: Cool
+(S)ettings: True
+Enter your command: P 50, V veryCool, S
+Parameter = 50
+Variable = veryCool
+Settings is now set to FALSE
+
+To wrap up, for any sub menu, the command Q will return you to the Top menu. Any commands following Q that are currently set to be executed will be aborted.
+
+---------------------------
+TOP MENU
+The Top menu acts as the program's main menu. Most commands here will take you to a sub menu, from where you can directly view and set parameters. For each sub menu, simply enter the command letter and hit enter to go to that menu. (For info about each sub menu, go to their respective section). Along with the submenu commands, there are a few special commands. Entering G starts the AI with the current settings. Entering S allows you to save the current settings to a file, and L allows you to load these settings. More details will be provided on saving/loading in the next section. Finally, the Top menu is where you end the program. Entering E will end the program.
+Note that the Top menu has special syntax and behavior. First of all, you can set parameters from the Top menu by entering a sub menu command followed by a string of commands in quotation marks. For instance:
+
+TOP MENU
+(D)ata Collection
+Enter Command: D "E, I 60, G 40"
+Data Collection is now ON
+Identity = 60
+Games = 40
+(NOTE: These are just example parameters, and don't exist in the program)
+
+To set parameters from across multiple sub menus, you'll have to write the command and arguments to pass, and seperate each sub menu command with a comma. In essence, you're just entering a string of commands with an argument, just like how it is in sub menus.
+Also note that if you set up a string of submenu commands, but DON'T pass arguments, then when you return to the top menu you'll be immediately brought to the next sub menu.
+
+D = Data Collection Menu
+A = Automation Menu (Automated Trainer & Bot Versus Bot mode)
+R = Bot Refresh Menu
+P = Machine Learning Parameters Menu
+S[no arguments] or L[no arguments] = Save/load menu
+S[file name] > Save current parameters to indicated file
+L[file name] > Load parameters from indecated file
+G > Starts the AI with the current parameters
+E > Ends program
+
+---------------------------------
+SAVING/LOADING
+
+You can save and load settings files from the Top menu. To save a file, enter S followed by the name of the file you would like to save to. Do not include the file extention, or any relative path info. To load a file, enter L followed by the name of the file you would like to load.
+If you attempt to overwrite an existing save file, you will be notified and given the chance to abort.
+Note that file names may only include letters, numbers, or the three symbols [-._]. This is a portability measure. 
+
+When saving parameters, you'll usually end up saving ALL parameters. If you are currently using Bot Versus Bot mode, then the current Target bot will be the one who's parameters are saved. When loading parameters, all parameters will be loaded unless you are in Bot Versus Bot mode. If you're in BVB mode, you'll be given the option to only load "bot specific" parameters (such as Automated Trainer and Refresh Period). These parameters will be loaded onto the current Target bot. For more info on Bot Versus Bot mode, see the Automated Trainer Menu section.
+Note: You cannot save or load the parameters for data collection output destination with these commands. See the Data Collection Menu section for more details.
+When loading a save file that turns on Bot Versus Bot mode, all parametre settings will be applied to the Primary bot, leaving the Secondary bot unchanged.
+
+If you call S or L with NO arguments, then you'll go to the Save/Load sub menu. This menu allows you to see the list of save files you currently have, and gives you the option to view the save files' contents. When you first open the menu, it will print out all the save files. From there, you can enter V followed by a save file's name to view it's contents. Enter R to reprint the list of files, and Q to return to the Top menu. Finally, enter C followed by a file name to save/load that file. Note that if you got to this menu via S, you can only save files. If you got to this menu via L, you can only load files. When saving a file, entering a file name that doesn't currently exist will allow you to create a new save file.
+
+V[file name] > View the contents of the file
+C[file name] > saves/loads the passed file
+R > Reprints the list of saved files
+
+One of the saved files is named 'default'. This file contains the parameters loaded at the start of the program. Overwrite this file if you want different parameters from the very start. For future reference, here are the default parameter values:
+
+Auto Training Enabled=False
+Training Duration=50
+Auto Trainer Algorithm=defaultTrainer
+Bot Versus Bot mode active=False
+Number of Rounds=100
+Data Collection Enabled=False
+Number of Games=30
+Data Discard Interval=0
+Delimiter=''
+Refreshing Enabled=False
+Refresh Period=30
+First Hidden State Size=9
+Second Hidden State Size=5
+Memory Length=4
+Memory Type=Move
+Current Loss Metric=Predict Throw
+
+Finally, you can edit save files manually. Save files are stored in \\RPSbotWD\\RPSbotSaves\\, relative to the AI's home directory. Do note that if you make improper changes, you may accidentally break the program, so use caution if you take this route. The parameter order is:
+
+Automated trainer Algorithm
+Automated Trainer Duration (negative means off)
+Bot Versus Bot Duration (negative means off)
+Data Collection Enabled
+Data Discard Interval
+Number of Games
+Bot Refresh Period (negative means off)
+Layer 1 Hidden Size
+Layer 2 Hidden Size
+Memory Length
+Memory Type
+Loss Metric
+
+----------------------
+DATA COLLECTION MENU
+When Data Collection is active, the bot will automatically play multiple games against an Automated trainer or against the Secondary bot, and the results will be APPENDED to a save file, with information about the date and parameters used in the run at the top. In general, it's a research tool. NOTE: in order to use this feature, an automation feature must also be on. This means that either Bot Versus Bot mode is on, or the Automated Trainer is on. Turning on Data Collection while both automated features are turned off will cause Automated Training to be turned on, and turning off those features will disable Data Collection.
+To turn this feature one and off, enter E. To set the number of games to collect data from, enter G followed by the new value. This menu has another parameter called the Data Discard Interval. This parameter represents the number of rounds to ignore the results of each game. The idea is that the bot needs to learn a pattern before it can be any good. As such, the first few rounds are more likely to br wrong, and would skew the bot's performance data. This parameter can give a clearer idea of the bot's ability to learn. Data Discard Interval is set with I.
+NOTE: If the number of rounds in a game are less than or equal to the Data Discard Interval, then no data will be discarded.
+The number of rounds played is equivlant to the Automated Trainer's Training Duration UNLESS Bot Versus Bot mode is on, in which case the number of rounds is equal to the parameter "Number of Rounds".
+
+There are two parameters used to determine where the output data goes. The first is the Absolute Save Directory. It's the home directory for saving output data. The second parameter is the Output File Name. The Output File Name is the location relative to the ASD where the output data will be saved. Unlike with parameter save files, output saves can be relative file pathes.
+To set the Absolute Save Directory, enter A followed by the ENTIRE file path for a FOLDER. This command will NOT create a new folder is one does not exist. To view the currently set ASD, enter A with no arguments. NOTE: The ASD is a PERSISTENT parameter. Anytime it is changed, that change is saved in a file and loaded at run time. The default directory is \RPSbotWD\RPSbotDataCollection\.
+To set the Output File Name, enter F followed by the desired file name, minus file extension. You can also set the output to go to the console by entering F with no arguments. If you do this, however, NO DATA WILL BE SAVED. You can also see the last five output save locations by entering F with \ as the argument. Note that this parameter cannot be saved, and will always default to "output" on start up.
+
+The final parameter is Delimiter. When the Delimiter has no value (it will be listed as '' or ""), then output data will be formatted as normal. If a Delimiter is set, then the output data will be formatted as raw numbers sperated by the delimiter. To set the Delimiter, enter D followed by your argument IN QUOTATION MARKS. This is the only command that requires quotation marks like this. To reset the Delimiter, enter D followed by '' or "".
+
+E > Enable/disable Data Collection
+G[integer] > Set number of games
+I[integer] > Set data discard interval
+F[file name] > Sets output location
+F[\] > prints last five files
+F[no argument] > sets output to console
+A[file path to folder] > Sets Absolute Save Directory
+A[no arguments] > prints ASD
+D'[argument]' > sets the Delimiter
+
+-----------------------------------
+AUTOMATED TRAINING MENU
+This menu is where automation features can be set. These features allow you to control what the bot plays against in Data Collection mode, or allows you to have the bot train against some computerized opponent just before its game against you. There are two features in this menu: Automated Trainer, and Bot Versus Bot mode. This section will focus on the Automated Trainer, and the next section will cover Bot Versus Bot mode.
+
+The Automated Trainer feature allows users to pit the AI against a custom made Rock Paper Scissors algorithm. This allows the user to test the bot's performance against a range of automated strategies. For info on how to make your own Automated Trainer, se the section "Programing an RPStrainer". For now, this section will focus on setting bot parameters and what they do.
+To enable the Automated Trainer, enter E. To set the number of rounds the AI will play against the Automated trainer, enter D followed by a number. If Bot Versus Bot mode is turned off, then this variable determines how many rounds the bot will play each game in Data Collection mode. If Data collection is also turned off, then after the Training Duration is done, the user will be given the current score and allowed to pick up the game from where the Automated Trainer left off.
+To set the Algorithm used by the Automated Trainer, enter A followed by either a number or the name of the trainer you want to use. When the program is started, it reads off all the functions in the file it was launched from, and stores any that are trainers in its memory. It also assigns numbers to these functions according to their apperance order. The function closest to the top gets assigned 1, the next gets assigned 2, etc. There's also a default trainer which always throws a random value as it's move. It's name is defaultTrainer and it's number is 0. You can pass either the number of the name as an argument to A. If you pass no arguments, then A will instead print out the list of trainer functions and their corrosponding numbers.
+
+E > Enable Automated Training
+D[integer] > Set the number of rounds the AI will play against the trainer
+A[integer or function name] > Sets the Automated Trainer to use the indicated algorithm
+A[no argument] > Prints out the list of trainer functions and their associated numbers
+
+----------------------------------------
+BOT VERSUS BOT MODE
+The second feature in the Automated Training menu, this mode allows you to pit the AI against itself. Not only that, but the second AI is fully configureable independent of the main AI. This section will cover the parameters for Bot Versus Bot mode, as well as other important mechanics for this mode.
+
+First off, the two bots have their own names. The bot you normally play against is called the Primary bot. The new bot that is used exclusivly in Bot Versus Bot mode is called the Secondary bot. In Bot Versus Bot mode, the Secondary bot will take on the role of "player" and will functionally train the Primary bot.
+
+To enable Bot Versus Bot mode, enter V. To set the number of rounds the bots will play against each other (after completeing any training), enter R followed by a number. At the end of this period, if Data collection is turned on, then the game will end. Otherwise, the Secondary bot will be turned off and the game will continue between the Primary bot and you.
+
+Both the Primary and Secondary bots have their own parameters, completely independent of the other bot's. When you activate Bot Versus Bot mode, you'll notice a new colum of parameters, each labeled as "Secondary". These are the Secondary bot's corrosponding parameters. You'll also notice a new command: Swap Target (B)ot. The Taget bot is the bot who's parameters you are currently setting. Parameters are set the same way as normal, but if you enter B from any menu, you'll swap the target bot between the Primary and Secondary bot. Your target bot also determins which bot is affected by loading and saving.
+
+Note that not all parameters are seperate for the bots. Things like Data Collection are shared between them, for obvious reasons. Also note that the Training Duration in this mode does NOT count towards the number of rounds or Data Discard Interval.
+
+V > Enables Bot Versus Bot mode
+R[integer] > Sets the number of rounds the bots play against each other
+B > Swaps the Target bot between Primary and Secondary
+
+-------------------------------------
+BOT REFRESH MENU
+This simple feature is meant to address the problem of overfitting. If the bot gets too used to a specific strategy, it may struggle to correct itself if the opponent suddenly changes strategy. What this feature does is train TWO bots at once, with one bot activly playing against the opponent, and the other looking for patterns in the most recent set of moves. At the end of every refresh period, the active bot is retired and replaced with the background bot, who has only been trained on the most recent moves. Now it will be wise to the current pattern. A new background bot is also created to start learning from the new active bot as it plays against you.
+To enable Bot Refreshing, enter E. To set the number of rounds between each refresh, enter P followed by a number.
+
+E > activate Bot Refreshing
+P[integer] > Set the number of rounds between refreshes
+
+---------------------------------------
+BOT PARAMETERS MENU
+This menu holds the parameters that defines how the bot "thinks". This affects how much info is put used at a time, what info is remembered or generated, or how accuracy is determined.
+
+The first two parameters here are the First and Second Hidden State sizes. There are two layers in this program's neural network architecture. The first layer takes in the input (your play history), and performs some calculations to output an intermediate anwer. Then the second layer takes the intermediate answer, along with the initial input again, and produces yet another intermediate answer that is boiled down to just three numbers: the probabilites that the bot should play rock, paper, or scissors that round. Having larger Hidden State Sizes means the AI can learn more complex patterns, at the cost of running slower. To set the First Layer's size, enter F followed by a number. To set the Second Layer's size, enter S followed by a number.
+
+The next parameter is the Memory Length. This parameter sets the explicit memory of the AI. In other words, longer memories means more of your previous moves will be used to calculate the bot's next move. This is alongside the built-in memory of the recurrent neural network architecture, which cannot be manipulated. To set the Memory Length, enter L followed by a number.
+
+Memory Type is an experimental parameter. Usually, the AI's memory contains the previous moves the user has made. But this parameter allows you to change the memory to hold CHANGE instead of MOVES. Change is the relationship betwee two moves. Either you play the same move twice in a row, you play the move that beats your previous move, or you play the move that loses to your previous move. This is the info that is now sent to the AI each round. To switch between the MOVE and CHANGE memory types, enter T.
+
+Finally, there is the Loss Metric. Loss Metrics are how the AI determines how correct or incorrect its move is each turn. There are 6 Loss Metrics:
+1=Predict Move: This metric simply means that the AI tries to guess what your next move is, and tries to counter it.
+2=Direction Mirroring: This metric has the AI try to copy your change. In other words, if it predicts that this turn, you'll play the move that beats your previous one, then the bot will play the move that beats ITS previous move. And it works way better than you'd expect.
+3=Direction Prediction: This metric uses change to determine if the bot should play the move that beats, loses, or ties with its previous move. It ignores your change, though.
+4=PM Outcome: This metirc is... weird. To put it simply: the first three metrics set the correct answer using your current move, as well as your's or the bot's previous move. This metric uses your current move, previous move, and the outcome of the previous round to tell the bot what output it should have generated.
+5=BM Outcome: Exactly the same as PM Outcome, except it uses the BOT'S previous move instead of your own.
+6=PM Outcome 2: Same as PM Outcome, except it uses different math.
+
+To set the Loss Metric, enter L followed by the desired metrics corrosponding number
+
+F[integer] > Set first layer's output size
+S[integer] > Set second layer's output size
+M[integer] > set memory length
+T > Toggle between MOVE and CHANGE memory types
+L[integer] > sets the Loss Metric
+
+===========================================
+PLAYING AGAINST THE BOT
+To start the bot, enter G from the top menu. This will launch the AI.
+The AI is very simple to use. First, the bot will ask for for your move. Input R to play rock, P for paper, or S for scissors. Then, the AI will show you the bot's move, and print out the current running total of ties, player wins, and bot wins, along with the number of rounds and the percentage of each type of outcome. You'll also get a cumulitive score, which represents how much better you you are than random (if the outcome is random, you'll get a score of 0. The higher win rates will mean a higher score).
+There's also a feature called the "checkpoint". The checkpoint serves as a split of sorts, showing the cumulative score starting from the round where you set the checkpoint. This can be a great way to test how well the bot is learning, or how quickly it adapts to a change in strategy. To set a checkpoint, instead of entering a move, enter C. Next round, the checkpoint stats will appear below the normal ones.
+Finally, to end the game, enter "exit" (the whole word must be entered). This will return you to the Top menu.
+
+===========================================
+PROGRAMING AN RPStrainer
+The Automated Trainer allows users to train a bot against a custom training algorithm. This section covers how to write such an algorithm, and what built in features you have at your disposal.
+
+-------------------------
+THE RPStrainer ABSTRACT CLASS & SYNTAX
+rockPaperScissorsBotV1.py contains an abstract class called "RPStrainer". All training algorithms are children of this class.
+Due to how the program loads trainers, there are some very specific rules that must be followed when setting up a trainer. First, the trainer MUST be in the same python file as the one the AI is executed from. Do NOT execute the AI directly from rockPaperScissorsBotV1.py. Second, when declaring the new class, you must A) use NO unnecessary spaces B) Use RPStrainer as RPStrainer. Do NOT give RPStrainer a different name when importing. Otherwise, the main program won't load it. Next, the very first function that must be defined for the class is ___Name___(self). That's three underscores on each side. This funciton will return a string containing the name of the class exactly, of the form [return "className"]. Do NOT include comments on the first three lines of the class. All of these requirements are security measures, so please be understanding. Once you have the first three lines, the rest of the class follows normal python syntax.
+
+---------------------------
+THE FUNCTIONS
+
+REQUIRED:
+
+computeMove(self, playerPrevMove, BotPrevMove, outcome)
+>>playerPrevMove==int, represents the previous move the player made. 0=rock, 1=paper, 2=scissors
+>>BotPrevMove==int, represents the previous move the AI mode. 0=rock, 1=paper, 2=scissors
+>>outcome==int, represents the outcome of the last round. 0=tie, 1=player won, 2=bot won
+>>RETURNS: An int corrosponding to the bot's move for the current round. 0=rock, 1=paper, 2=scissors
+>>>>>>Description: This is the only fully abstract function in the RPStrainer class, and the only one that requires implementation. This is the function where you put your strategy for the trainer, simple as that. The bot MUST return 0,1, or 2, or else the AI will abort the game and return to the Top menu.
+
+OPTIONAL:
+These functions have basic default implementations, but are available to the user to override.
+
+computeFirstMove(self)
+>>RETURNS: An int corrosponding to the bot's move for the first round. 0=rock, 1=paper, 2=scissors
+>>DEFAULT BEHAVIOR: Randomly chooses to return 0, 1, or 2 with equal probability
+>>>>>Description: This function is called on the very first move of the game. That is because, on the very first move, there IS no previous rounds to pull data from
+
+__init__(self)
+>>RETURNS: an instance of the trainer
+>>DEFAULT BEHAVIOR: Implicitly defined. Not explicitly implemented.
+>>>>>>>Description: !!!IMPORTANT!!! There are two initialization functions. This is the first of them, and is called ONLY when a bot's Automated Trainer is set to the target training algorithm. There is a function called getUserInput() that can be used in this function to allow your trainer to have configurable parameters, among other things. Remember this when looking at the other initialization function, preGameAssignment().
+
+preGameAssignment(self)
+>>RETURNS: Nothing
+>>DEFAULT BEHAVIOR: Nothing. It's just ignored.
+>>>>>>>Description: This is one of two initialization functions. This function is called at the start of every GAME. Consider if you have a trainer that tracks the number of rocks, papers, and scissors that the AI throws. In order to properly reset these counts at the start of a game, you would have to use define that behavior in this function.
+
+UTILITY:
+These functions should NOT be overridden, but instead provide some basic functionality you may find useful.
+
+getChange(self, firstMove, secondMove)
+>>firstMove==int, represents the "origin" move
+>>secondMove==int, represents the "destination" move
+>>RETURNS: int representing the change from the origin move to the destination move. 0=tie, 1=destination beats origin, 2= origin beats destination.
+>>>>>>>Description: It calculates the change between two moves. There are some loss metrics that use change to assess accuracy, so it is likely useful if your bot can calculate change as well.
+
+randThrow(self)
+>>RETURNS: int, randomly choosen from the pool [0,1,2] with equal probability.
+>>>>>>>Description: This function generates random throws. It's the default return for computeFirstMove(). Could be useful.
+
+getUserInput(self, inputPrompt)
+>>inputPrompt==String, the prompt requesting the user's input
+>>RETURNS: The user's input AS AN UNPARSED STRING
+>>>>>>>>>Description: This function does exactly as it says. It allows the trainer to pause and ask the user for input before continuing it's game. It's primary function is for use in Bot Versus Bot mode, where the two bots are being executed concurrently in seperate threads. By using this function to get user input, you'll be told which bot's trainer is requesting input, and the bot's won't stumble over each other while printing input prompts.
