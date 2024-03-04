@@ -286,7 +286,7 @@ class daBot():
             loss=loss_fnX(output,movedict.get(upDict.get(userMove[0])))
         elif self.lossMetric==2:#directionMirroring: output is interpreted as the change between the bot's previous move and current move. Get's converted into the Rock Paper Scissors move space back in the main loop
             targetMove = nn.functional.softmax(movedict.get(userMove)[-1], dim=0).data
-            TM_reduced = torch.max(targetMove, dim=0)[1].item()
+            TM_2 = torch.max(targetMove, dim=0)[1].item()
             originMove = nn.functional.softmax(self.userHistory[-1], dim=0).data
             OM_2 = torch.max(originMove, dim=0)[1].item()
             loss=loss_fnX(output,movedict.get(botDict.get(((TM_2-OM_2)+3)%3)))
@@ -342,7 +342,7 @@ class daBot():
             loss=loss_fnX(output,movedict.get(upDict.get(userMove[0])))
         elif self.lossMetric==2:#directionMirroring: output is interpreted as the change between the bot's previous move and current move. Get's converted into the Rock Paper Scissors move space back in the main loop
             targetMove = nn.functional.softmax(movedict.get(userMove)[-1], dim=0).data
-            TM_reduced = torch.max(targetMove, dim=0)[1].item()
+            TM_2 = torch.max(targetMove, dim=0)[1].item()
             originMove = nn.functional.softmax(self.userHistory[-1], dim=0).data
             OM_2 = torch.max(originMove, dim=0)[1].item()
             loss=loss_fnX(output,movedict.get(botDict.get(((TM_2-OM_2)+3)%3)))
@@ -394,7 +394,7 @@ class daBot():
             automatedTrainerActive=True
             userMove=self.trainerClass.getNextMove(None,None,None) 
         elif(self.botVbotCountDown>0):#User input isn't requrested in the first rounds of botVbot mode.
-            userMove="" 
+            userMove=" " 
         else: #Get the user's first move
             print("Type R for rock, P for paper, or S for scissors. Type C to set a checkpoint. Type EXIT to end.")
             userMove=input("Enter your move: ").lower()
@@ -602,6 +602,8 @@ class daBot():
                     self.numPlayerWins=0
                     self.numTies=0
                     self.numRounds=0
+                    if self.botVbotCountDown==self.botVbotDuration:
+                        score=0
 
 #I'm not 100% sure why I have the global booleans. They all relate to if the features of the AI are on or off, which is already encoded in the sign of the
 #Corrosponsing AI variable. But eh. If a variable is followed by 'Sec', that means it's the 'Secondary' AIs variable.
@@ -1499,9 +1501,9 @@ def main():
     LM2=metrics.get(secondaryBot.lossMetric)
     condensedMemTypePrint=lambda tarBot: "%-27.27s"%(('Change' if tarBot.memoryType else 'Move'))
     #Cont vars are used as collapsed parameter lists. If a feature is turned off, then the parameters dictating that features behavior won't show up on the top menu.
-    autoCont=f"\nTraining Duration: {smartFormatter('automationTrainingDuration','21')}\nAuto Trainer Algorithm: {smartFormatter('trainerClass.___Name___()','16')}" if (automationBoolean or automationBooleanSec) else " "
+    autoCont=f"\nTraining Duration: {smartFormatter('automationTrainingDuration','21')}\nAuto Trainer Algorithm: {smartFormatter('trainerClass.___Name___()','16')}" if (automationBoolean or (automationBooleanSec and botVbotBoolean)) else " "
     dataCont=f"\nNumber of Games: {numberOfGames}\nData Discard Interval: {abs(primaryBot.collectionDiscardInterval)}\nOutput File Destination: {fileName}\nDelimiter: {Deliminator}" if dataCollection else " "
-    refreCont=f"\nRefresh Period: {smartFormatter('botRefreshCyclePeriod','24')}" if (botRefreshCycleBoolean or botRefreshCycleBooleanSec) else " "
+    refreCont=f"\nRefresh Period: {smartFormatter('botRefreshCyclePeriod','24')}" if (botRefreshCycleBoolean or (botRefreshCycleBooleanSec and botVbotBoolean)) else " "
     versusCont=f"\nNumber of Rounds: {abs(primaryBot.botVbotDuration)}" if botVbotBoolean else " "
     
     print("TOP MENU\nThis is the Rock Paper Scissors AI launch menu. Enter various options to load or set parameters, or start the AI.\n"+
@@ -1534,9 +1536,9 @@ def main():
             i=0
             LM=metrics.get(primaryBot.lossMetric)
             LM2=metrics.get(secondaryBot.lossMetric)
-            autoCont=f"\nTraining Duration: {smartFormatter('automationTrainingDuration','21')}\nAuto Trainer Algorithm: {smartFormatter('trainerClass.___Name___()','16')}" if (automationBoolean or automationBooleanSec) else " "
+            autoCont=f"\nTraining Duration: {smartFormatter('automationTrainingDuration','21')}\nAuto Trainer Algorithm: {smartFormatter('trainerClass.___Name___()','16')}" if (automationBoolean or (automationBooleanSec and botVbotBoolean)) else " "
             dataCont=f"\nNumber of Games: {numberOfGames}\nData Discard Interval: {abs(primaryBot.collectionDiscardInterval)}\nOutput File Destination: {fileName}\nDelimiter: {Deliminator}" if dataCollection else " "
-            refreCont=f"\nRefresh Period: {smartFormatter('botRefreshCyclePeriod','24')}" if (botRefreshCycleBoolean or botRefreshCycleBooleanSec) else " "
+            refreCont=f"\nRefresh Period: {smartFormatter('botRefreshCyclePeriod','24')}" if (botRefreshCycleBoolean or (botRefreshCycleBooleanSec and botVbotBoolean)) else " "
             versusCont=f"\nNumber of Rounds: {abs(primaryBot.botVbotDuration)}" if botVbotBoolean else " "
             print(f"\nAuto Training Enabled: {smartFormatter('automationBoolean','17')}{autoCont}\n\nBot Versus Bot mode active: {str(botVbotBoolean)}{versusCont}\n\n"+
             f"Data Collection Enabled: {str(dataCollection)}{dataCont}\n\nRefreshing Enabled: {smartFormatter('botRefreshCycleBoolean','20')}{refreCont}\n\n"+
