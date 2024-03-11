@@ -115,11 +115,11 @@ class RPStrainer(ABC):
             daGoods=input(inputPrompt)
             trainerInputSem.release()
             return daGoods
-            ##SecondarybotthreadId HAS to be checked first. Initialization of these variables means that when secondaryBot checks it's ID, it is possible that primaryID == secondaryID
+            #SecondarybotthreadId HAS to be checked first. Initialization of these variables means that when secondaryBot checks it's ID, it is possible that primaryID == secondaryID
         else:
             return input(inputPrompt)
-    ##If the user has the trainer track some variables, this is the function called to reinitialize those variables.
-    ##Called at the start of every game.
+    #If the user has the trainer track some variables, this is the function called to reinitialize those variables.
+    #Called at the start of every game.
     def preGameAssignment(self):
         return 0 
 
@@ -270,6 +270,10 @@ class daBot():
             initializerSem.acquire()
             primaryBotThreadID=threading.get_native_id()
         self.trainerClass.preGameAssignment()
+        self.matchUpDict={"(r,r)":[0],"(r,p)":[0],"(r,s)":[0], #Used for tracking the number of matchups for data collection mode
+                          "(p,r)":[0],"(p,p)":[0],"(p,s)":[0],
+                          "(s,r)":[0],"(s,p)":[0],"(s,s)":[0]}
+        self.dataSplitsStorage=[]#Stores the current round at each split in data collection mode
 
     ###Updates the parameters of the input model. Returns the output prediction of the model
     ##modelX=the model being trained
@@ -383,13 +387,24 @@ class daBot():
         optimizerX.step()
         optimizerX.zero_grad()
 
-    #The heart of the AI. This is the came loop
+    ##The heart of the AI. This is the main loop that accepts user input and passes data between the net and the user, primary & secondary bots
     def mainLoop(self):
-        global botVbotAmbassador, primaryAmbassador, secondaryAmbassador
-        ###Initializeation
+        global botVbotAmbassador, primaryAmbassador, secondaryAmbassador, dataCollectionMoveRecord,dataCollectionSplits
+        #Initializeation
         score=0
         self.initialize()
+        dataDiscardMoveRecorderThing=True #Var used for tracking data discard interval stuff specifically for move recording. If False, then it will assume data discard is over/does not apply
+        if self.collectionDiscardInterval==0:
+            dataDiscardMoveRecorderThing=False
+        elif (self.botVbotCountDown<=0): #if data discard interval is too big, data isn't supposed to be lost. Since I can't reset what's already been printed/written, a special pre-emptive var is required for protecting move recording data
+            if self.trainingCountDown<self.collectionDiscardInterval:
+                dataDiscardMoveRecorderThing=False
+        else:
+            if self.botVbotCountDown<self.collectionDiscardInterval:
+                dataDiscardMoveRecorderThing=False
         automatedTrainerActive=False #As long as the bot is being trained by the automated trainer, this variable is True
+        if((not self.isTrainer) and self.dataCollection and fileName[0]!='['): #Opening save file for data recording
+            outputFile=open(dataCollectionPath+fileName+".txt","a")
         if(self.trainingCountDown>0): #Get first move from automated trainer
             automatedTrainerActive=True
             userMove=self.trainerClass.getNextMove(None,None,None) 
@@ -400,7 +415,7 @@ class daBot():
             userMove=input("Enter your move: ").lower()
             while userMove=="" or (userMove!="exit" and userMove[0]!='s' and userMove[0]!='r' and userMove[0]!='p'):
                     userMove=input("Invalid input, enter new value: ").lower()
-        ###Main loop
+        ###Main main loop
         while userMove!="exit": #Loop until user enters "exit" keyword
             userMove=userMove[0]
             
@@ -438,10 +453,10 @@ class daBot():
                     output=self.secondOutput(self.model) #Generating bot move for botVbot mode
                 else:
                     output=self.modelUpdate(self.model,self.optimizer,self.loss_fn,userMove,botMove) #generating bot move and calculating loss + model update for non-botVbot mode
-                ###Process output and convert it to "move space" (movedict mapping).
-                ##In other words, if the loss metric altered the userMove when calculating loss, the following code performs the reverse operations to get the AI's output into the same domain as the userMove
+                #Process output and convert it to "move space" (movedict mapping).
+                #In other words, if the loss metric altered the userMove when calculating loss, the following code performs the reverse operations to get the AI's output into the same domain as the userMove
                 prob = nn.functional.softmax(output[-1], dim=0).data
-                if (self.lossMetric==2 or self.lossMetric==3): ###Converting from change space to move space.
+                if (self.lossMetric==2 or self.lossMetric==3): #Converting from change space to move space.
                     botMove = botDict.get((torch.max(prob, dim=0)[1].item()+reverseBotDict.get(botMove))%3)
                     if self.lossMetric==2:# Direction mirroring can be highly accurate... but if it makes a mistake, it tends not to correct itself. This is where the correction is made
                         if self.outcome==1:#if bot lost last round
@@ -467,8 +482,8 @@ class daBot():
                     if self.outcomeHistory[0][1]==1:
                         prob=torch.tensor([[prob[0][0].item(),prob[0][2].item(),prob[0][1].item()]]) #Undoes the swap
                     botMove = botDict.get((torch.max(prob[0], dim=0)[1].item()))
-                elif(self.lossMetric==6): ##I don't know what to say about this mapping.
-                    prob_2=torch.max(prob, dim=0)[1].item()#A1
+                elif(self.lossMetric==6): #I don't know what to say about this mapping.
+                    prob_2=torch.max(prob, dim=0)[1].item()
                     if self.userHistory[0][2]==1:
                         prob_2+=2
                     outcomeTargetKey = nn.functional.softmax(self.outcomeHistory[-1], dim=0).data#A2
@@ -504,7 +519,7 @@ class daBot():
                 else:
                     if (not self.isTrainer) and not self.dataCollection: #Prints bot's move. When using a trainer to prepare a bot to play against a human, you'll want to print the bot's last move. Any other time a trainer is used, never print bot move.
                         print("Bot move: "+botMove)
-            ##Score keeping and outcome update
+            #Score keeping and outcome update
             if userMove==botMove:
                 self.numTies+=1
                 self.numTiesC+=1
@@ -525,7 +540,18 @@ class daBot():
                 self.outcomeHistory=torch.tensor([[0., 1., 0.]])
             self.numRounds+=1
             self.numRoundsC+=1
-
+            if(self.dataCollection and dataCollectionMoveRecord>0 and not dataDiscardMoveRecorderThing): ##Recording this round's moves to the output file
+                if((self.botVbotDuration<0) or (not self.isTrainer and (automatedTrainerActive==False or self.trainingCountDown<=0))):
+                    if(dataCollectionMoveRecord==3): #No return values here
+                        self.recordMoves("(%s,%s)"%(botMove,userMove))
+                    elif fileName[0]!='[':
+                        outputFile.write(self.recordMoves("(%s,%s)"%(botMove,userMove)))
+                    else:
+                        holdEm=self.recordMoves("(%s,%s)"%(botMove,userMove))
+                        if dataCollectionMoveRecord==2:
+                            holdEm=holdEm[:-1]#Remove newline char, as it just messes with the print
+                        print(holdEm)
+            
             if(not self.memoryType):#Calculate change
                 A1 = nn.functional.softmax(movedict.get(userMove)[-1], dim=0).data
                 A1_2 = torch.max(A1, dim=0)[1].item()
@@ -541,42 +567,70 @@ class daBot():
             if automatedTrainerActive==False or self.trainingCountDown<=0:
                 if(self.botVbotCountDown>=1):
                     self.botVbotCountDown-=1
-                    if self.dataCollection==True and (self.botVbotCountDown>0 and self.botVbotCountDown-(self.botVbotDuration-self.collectionDiscardInterval)==0):\
+                    if(not self.isTrainer and dataCollectionSplits>0 and self.dataCollection and self.numRounds%dataCollectionSplits==0):
+                        self.dataSplitsStorage.append([self.numRounds,self.numPlayerWins,self.numBotWins,self.numTies])
+                    if self.dataCollection==True and (self.botVbotCountDown>0 and self.botVbotCountDown-(self.botVbotDuration-self.collectionDiscardInterval)==0):
                        #Data discard interval score reset for botVbot mode
                         self.numBotWins=0
                         self.numPlayerWins=0
                         self.numTies=0
                         self.numRounds=0
-                if(self.botVbotCountDown<=0):##
+                        self.dataSplitsStorage=[] ##Highly inefficit way to keep splits from tracking discarded data for botVbotMode
+                        dataDiscardMoveRecorderThing=False
+                if(self.botVbotCountDown<=0):##Training AND botVbot mode have ended.
                     if(self.isTrainer):
                         userMove="exit" #Completely turn off the secondary bot's thread at the end of botVbot mode.
                     else: #Primary bot prints out/saves it's scoring data.
                         if(self.dataCollection and fileName[0]!='['): #Save data to output file
-                            outputFile=open(dataCollectionPath+fileName+".txt","a")
+                            if(dataCollectionMoveRecord>0):
+                                if(dataCollectionMoveRecord==1 and not(dataCollectionSplits>0 and self.numRounds%dataCollectionSplits==0)):
+                                    outputFile.write('\n')
+                                #This is where the table of move matchups is written to the output file
+                                matchupBracket=lambda insertable: ["(%s,r)"%(insertable),"(%s,p)"%(insertable),"(%s,s)"%(insertable)]
+                                listOinsertables=['r','p','s']
+                                for inserta in listOinsertables:
+                                    for m in matchupBracket(inserta):
+                                        outputFile.write("|%s: %5.d(%3.5f) "%(m,self.matchUpDict.get(m)[0],float(self.matchUpDict.get(m)[0])/float(self.numRounds)))
+                                    outputFile.write('\n')##Add new line at the end of each row of the table
                             if(len(self.delimiter)==0):
-                                outputFile.write("Rounds: %d  Player: %d (%3.5f)  Bot: %d (%3.5f)  Tie: %d (%3.5f)\n\n" % (self.numRounds,self.numPlayerWins,
-                                                                                          float(self.numPlayerWins)/self.numRounds*100,
-                                                                                          self.numBotWins,float(self.numBotWins)/self.numRounds*100,
-                                                                                          self.numTies,float(self.numTies)/self.numRounds*100))
+                                if self.botVbotDuration>0 and dataCollectionSplits>0 and self.numRounds%dataCollectionSplits==0: #The point of this is to keep the bot from printing to final round twice
+                                    self.dataSplitsStorage.pop()
+                                for datum in self.dataSplitsStorage:
+                                    outputFile.write("Round:  "+self.scorePrinter(datum[0],datum[1],datum[2],datum[3],0)+"\n\n")#Extra space for parsing
+                                outputFile.write("Rounds: "+self.scorePrinter(self.numRounds,self.numPlayerWins,self.numBotWins,self.numTies,0)+"\n")
+                                if(dataCollectionSplits>0 or (dataCollectionMoveRecord>0 and dataCollectionMoveRecord<3)):
+                                    outputFile.write("-----------------------------")
+                                outputFile.write("\n")
                             else:
-                                
-                                outputFile.write(str(self.numRounds))
-                                stats=((self.numPlayerWins,float(self.numPlayerWins)/self.numRounds*100),
-                                      (self.numBotWins,float(self.numBotWins)/self.numRounds*100),(self.numTies,float(self.numTies)/self.numRounds*100))
-                                for pair in stats:
-                                    outputFile.write("%s%d%s%3.5f"%(self.delimiter,pair[0],self.delimiter,pair[1]))
-                                outputFile.write("\n\n")
+                                if self.botVbotDuration>0 and dataCollectionSplits>0 and self.numRounds%dataCollectionSplits==0: #The point of this is to keep the bot from printing to final round twice
+                                    self.dataSplitsStorage.pop()
+                                for datum in self.dataSplitsStorage:
+                                    outputFile.write(self.scorePrinter(datum[0],datum[1],datum[2],datum[3],1)+"\n\n")
+                                outputFile.write(self.scorePrinter(self.numRounds,self.numPlayerWins,self.numBotWins,self.numTies,1)+"\n")
+                                if(dataCollectionSplits>0 or (dataCollectionMoveRecord>0 and dataCollectionMoveRecord<3)):
+                                    outputFile.write("-----------------------------")
+                                outputFile.write("\n")
                             outputFile.close()
                         else: #Print scoring data to console
-                            print("Rounds: %d  Player: %d (%3.5f)  Bot: %d (%3.5f)  Tie: %d (%3.5f)" % (self.numRounds,self.numPlayerWins,
-                                                                                              float(self.numPlayerWins)/self.numRounds*100,
-                                                                                              self.numBotWins,float(self.numBotWins)/self.numRounds*100,
-                                                                                              self.numTies,float(self.numTies)/self.numRounds*100))
+                            if(self.dataCollection):
+                                if(dataCollectionMoveRecord>0):
+                                    if(dataCollectionMoveRecord==1 and not(dataCollectionSplits>0 and self.numRounds%dataCollectionSplits==0)):
+                                        print("")#print a new line
+                                    #This is where the table of move matchups is printed to console
+                                    matchupBracket=lambda insertable: ["(%s,r)"%(insertable),"(%s,p)"%(insertable),"(%s,s)"%(insertable)]
+                                    listOinsertables=['r','p','s']
+                                    for inserta in listOinsertables:
+                                        printable=""#Since print automatically adds a new line char, a different approach is needed
+                                        for m in matchupBracket(inserta):
+                                            printable+="|%s: %5.d(%3.5f) "%(m,self.matchUpDict.get(m)[0],float(self.matchUpDict.get(m)[0])/float(self.numRounds))
+                                        print(printable)
+                                if self.botVbotDuration>0 and dataCollectionSplits>0 and self.numRounds%dataCollectionSplits==0: #The point of this is to keep the bot from printing to final round twice
+                                    self.dataSplitsStorage.pop()
+                                for datum in self.dataSplitsStorage:
+                                    print("Round:  "+self.scorePrinter(datum[0],datum[1],datum[2],datum[3],0)+"\n")#Extra space for parsing
+                            print("Rounds: "+self.scorePrinter(self.numRounds,self.numPlayerWins,self.numBotWins,self.numTies,0))
                             if(self.scoreCheckPoint==True):
-                                print("Checkpoint: %d  Player: %d (%3.5f)  Bot: %d (%3.5f)  Tie: %d (%3.5f)" % (self.numRoundsC,self.numPlayerWinsC,
-                                                                                                  float(self.numPlayerWinsC)/self.numRoundsC*100,
-                                                                                                  self.numBotWinsC,float(self.numBotWinsC)/self.numRoundsC*100,
-                                                                                                  self.numTiesC,float(self.numTiesC)/self.numRoundsC*100))
+                                print("Checkpoint: "+self.scorePrinter(self.numRoundsC,self.numPlayerWinsC,self.numBotWinsC,self.numTiesC,0))
                             print("Score: %d\n" % (score))
                         if(self.dataCollection==True): #End the game if in data collection mode
                             userMove="exit"
@@ -596,14 +650,65 @@ class daBot():
             else:#At the end of training for botVbot mode, or at the end of the data discard interval, reset the score keeping variales (excluding the literal score)
                 userMove=self.trainerClass.getNextMove(userMove, botMove, self.outcome)
                 self.trainingCountDown-=1
+                if(dataCollectionSplits>0 and self.dataCollection and self.botVbotDuration<=0 and self.numRounds%dataCollectionSplits==0):
+                    self.dataSplitsStorage.append([self.numRounds,self.numPlayerWins,self.numBotWins,self.numTies])
                 if ((self.dataCollection==True and (self.botVbotCountDown<=0 and self.trainingCountDown-(self.automationTrainingDuration-self.collectionDiscardInterval)+1==0))
                     or (self.botVbotDuration>0 and self.trainingCountDown==0 and self.botVbotCountDown==self.botVbotDuration)):
                     self.numBotWins=0
                     self.numPlayerWins=0
                     self.numTies=0
                     self.numRounds=0
+                    self.dataSplitsStorage=[] #Highly inefficit way to keep splits from tracking discarded data
+                    if(not self.botVbotDuration>0): #If botVbot mode, then the data discard interval hasn't happened yet
+                        dataDiscardMoveRecorderThing=False
+                    else:
+                        dataDiscardMoveRecorderThing=True
                     if self.botVbotCountDown==self.botVbotDuration:
                         score=0
+
+    ##Function for printing out the outcome totals and percentages
+    ##r=self.numRounds, pw=self.numPlayerWins, bw=self.numBotWins, t=self.numTies (or their checkpoint equivlents)
+    ##deliminat=boolean determining which format method to return.
+    ##Returns: A string to be appended onto wither "Rounds: " or "Checkpoint: "
+    def scorePrinter(self,r,pw,bw,t,deliminat):
+        if not deliminat:
+            return("%d  Player: %d (%3.5f)  Bot: %d (%3.5f)  Tie: %d (%3.5f)" % (r,pw,float(pw)/r*100,
+                                                                                bw,float(bw)/r*100,t,float(t)/r*100))
+        else: #Funky way of handling deliminator-seperated output.
+            daGoods=str(r)
+            stats=((pw,float(pw)/r*100),(bw,float(bw)/r*100),(t,float(t)/r*100))
+            for pair in stats:
+                daGoods+="%s%d%s%3.5f"%(self.delimiter,pair[0],self.delimiter,pair[1])
+            return daGoods
+
+    ##Function for handling recording each rounds moves and formatting the output
+    ##matchUp=a string representing each palyer's moves that round. Both moves are a single lowercase letter, with the AI's move first, surruonded by parentheses and seperated by a comma
+    ##Returns: A string formatted according to the global dataCollectionMoveRecord and dataCollectionSplits
+    def recordMoves(self,matchUp):
+        global dataCollectionMoveRecord #0 means this feature is off.
+        self.matchUpDict.get(matchUp)[0]+=1
+        if dataCollectionMoveRecord==1: #Just a single line of move match ups
+            if(fileName[0]=='['):
+                if dataCollectionSplits>0 and self.numRounds%dataCollectionSplits==0:
+                    return f"{matchUp} Round {self.numRounds}"
+                else:
+                    return matchUp
+            if(self.numRounds==1):
+                return matchUp+(f" Round {self.numRounds}\n" if dataCollectionSplits==1 else "")
+            else:
+                if dataCollectionSplits>0:
+                    if dataCollectionSplits==1:
+                        return f"{matchUp} Round {self.numRounds}\n"
+                    if self.numRounds%dataCollectionSplits==0:
+                        return f",{matchUp} Round {self.numRounds}\n"
+                    elif (self.numRounds-1)%dataCollectionSplits==0:
+                        return matchUp
+                return f",{matchUp}"
+        if dataCollectionMoveRecord==2: #Collumns
+            if(self.numRounds==1):
+                return("Bot\tTrainer\n%s\t%s\n"%(matchUp[1],matchUp[3]))
+            else:
+                return("%s\t%s"%(matchUp[1],matchUp[3])+(" Round "+str(self.numRounds)+"\n" if dataCollectionSplits>0 and self.numRounds%dataCollectionSplits==0 else "\n"))
 
 #I'm not 100% sure why I have the global booleans. They all relate to if the features of the AI are on or off, which is already encoded in the sign of the
 #Corrosponsing AI variable. But eh. If a variable is followed by 'Sec', that means it's the 'Secondary' AIs variable.
@@ -618,6 +723,8 @@ targetBot=None #Pointer used for deciding which AI to set the variables for
 dataCollectionPath=getcwd()+"\\RPSbotWD\\RPSbotDataCollection\\" #Absolute Save Directory
 fileName="output" #File save location
 Deliminator="''"
+dataCollectionSplits=0
+dataCollectionMoveRecord=0
 
 outputQue=deque(maxlen=5)#Que used for tracking most recent data output locations
 
@@ -688,15 +795,21 @@ def smartFormatter(parameter, spacingInt='0'):
     else:
         return eval("'%-"+spacingInt+".d%s'%(abs(primaryBot."+parameter+"),('' if not botVbotBoolean else f'  Secondary: {abs(secondaryBot."+parameter+")}'))")
 
+
+dataCollectionSplits=0
+dataCollectionMoveRecord=0
+
 ##The data collection sub menu
 ##val=the string of arguments passed from the top menu
 ##Returns: Nothing at all. Return statements are just used to end the function
-##Globals used: target/primary/secondaryBot, dataCollection, numberOfGames, dataCollectionPath, fileName, Deliminator,automationBoolean,botVbotBoolean,outputQue
+##Globals used: target/primary/secondaryBot, dataCollection, numberOfGames, dataCollectionPath, fileName, Deliminator,automationBoolean,botVbotBoolean,outputQue,
+##dataCollectionSplits,dataCollectionMoveRecord
 def setDataCollects(val):
-    global dataCollection
-    global numberOfGames
-    global automationBoolean
+    global dataCollection, numberOfGames
     global dataCollectionPath, fileName, Deliminator
+    global dataCollectionSplits, dataCollectionMoveRecord
+    global automationBoolean
+    MoveRecString={0:"OFF",1:"Single line",2:"Columns",3:"Running Total"}
     #Some checks for if top menu has passed some arguments or not. If yes, prepares them to be ran throuh the command parser
     if(len(val)>1 and val[0]==val[-1] and (val[0]=="\"" or val[0]=="\'")):
         command=val[1:-1]+',q'
@@ -708,9 +821,10 @@ def setDataCollects(val):
               "To set the default directory files will be saved to (the Absolute Save Directory), enter A (entering A with no arguments prints the current Absolute Save Directory). "+
               "To set the name of the output file, enter F. Supplying no arguments will send output to the console, where it will NOT be saved. Passing \\ as the argument will print the last five save locations. "+
               "To set the Delimiter, enter D, and surround your argument in quotation marks. Having no delimiter will cause ouput to be formatted as usual. Having a delimiter will cause output to be formatted "+
-              "as raw numbers seperated by your delimiter. Once done, enter Q to return to the top menu.\n"+
-              f"\nData Collection (E)nabled: {str(dataCollection)}\nNumber of (G)ames: {numberOfGames}\nDiscard (I)nterval: {primaryBot.collectionDiscardInterval}\n"+
-              f"Output (F)ile Destination: {fileName}\n(D)elimiter: {Deliminator}"+("\nSwap Target (B)ot" if botVbotBoolean else ""))
+              "as raw numbers seperated by your delimiter. To set the bot to record data in splits, enter S. Set this parameter to zero to turn it off. "+
+              f"To turn on and set the formmating for move recording, enter M. Once done, enter Q to return to the top menu.\n"+
+              f"\nData Collection (E)nabled: {str(dataCollection)}\nNumber of (G)ames: {numberOfGames}\nDiscard (I)nterval: {'OFF' if not primaryBot.collectionDiscardInterval else primaryBot.collectionDiscardInterval}\n"+
+              f"Output (F)ile Destination: {fileName}\n(D)elimiter: {Deliminator}\n(S)plits: {(dataCollectionSplits if dataCollectionSplits>0 else 'OFF')}\n(M)ove Record: {MoveRecString.get(dataCollectionMoveRecord)}"+("\nSwap Target (B)ot" if botVbotBoolean else ""))
         command=input("\nEnter your command: ")
     parsedCommands=settingsParseBatch(command)
     while True:
@@ -730,8 +844,8 @@ def setDataCollects(val):
                     if int(ii)>=0:
                         primaryBot.collectionDiscardInterval=int(ii)
                         secondaryBot.collectionDiscardInterval=int(ii)
-                        print(f"Data Discard Interval = {ii}")
-                        if (int(ii)>=primaryBot.automationTrainingDuration if not botVbotBoolean else int(ii)>=primaryBot.botVbotDuration):
+                        print(f"Data Discard Interval = {'OFF' if ii=='0' else ii}")
+                        if (int(ii)>=abs(primaryBot.automationTrainingDuration) if not botVbotBoolean else int(ii)>=primaryBot.botVbotDuration):
                             print("NOTE: If Data Discard Interval is equal to or greater than the number of rounds played in a game, then it WON'T AFFECT THE DATA")
                             
                     else:
@@ -801,6 +915,26 @@ def setDataCollects(val):
                         print(f"Delimiter set to: {Deliminator}")
                     else:
                         print("Error: Invalid input. Make sure to surround the delimiter with \" \".")
+            elif i[0].lower()=='s':#Enable and set splits
+                ii=settingsParseInt(i)
+                if ii.isdigit():
+                    if int(ii)>=0:
+                        dataCollectionSplits=int(ii)
+                        print(f"Splits = {(dataCollectionSplits if dataCollectionSplits>0 else 'OFF')}")
+                    else:
+                        print("Error: You can not take splits at intervals less than 0")
+                else:
+                    print("Error: input is not in integer format")
+            elif i[0].lower()=='m':#Enable and set move recording
+                ii=settingsParseInt(i)
+                if ii.isdigit():
+                    if int(ii)>=0 and int(ii)<=3:
+                        dataCollectionMoveRecord=int(ii)
+                        print(f"Move Record Formatting = {MoveRecString.get(dataCollectionMoveRecord)}")
+                    else:
+                        print("Error: There are only 4 options for this variable. These options are labeled 1,2,3 or to turn move recording off, 0.")
+                else:
+                    print("Error: input is not in integer format. Move recording has only 4 options. These options are labeled 1,2,3 or to turn move recording off, 0.")
             elif i[0].lower()=='b' and botVbotBoolean: #Obligatory bot swap
                 swapTargetBot()
             elif i[0].lower()=='q': #End function and discard remaining commands for this submenu
@@ -810,8 +944,9 @@ def setDataCollects(val):
         print("\n------------------------------")
         if botVbotBoolean:
             print(f"Current Target bot: {'Primary bot' if targetBot==primaryBot else 'Secondary bot'}")
-        print(f"\nData Collection (E)nabled: {str(dataCollection)}\nNumber of (G)ames: {numberOfGames}\nDiscard (I)nterval: {primaryBot.collectionDiscardInterval}\n"+
-              f"Output (F)ile Destination: {fileName}\n(D)elimiter: {Deliminator}"+("\nSwap Target (B)ot" if botVbotBoolean else "")+"\n(Q)uit")
+        print(f"\nData Collection (E)nabled: {str(dataCollection)}\nNumber of (G)ames: {numberOfGames}\nDiscard (I)nterval: {'OFF' if not primaryBot.collectionDiscardInterval else primaryBot.collectionDiscardInterval}\n"+
+              f"Output (F)ile Destination: {fileName}\n(D)elimiter: {Deliminator}\n(S)plits: {(dataCollectionSplits if dataCollectionSplits>0 else 'OFF')}"+
+              f"\n(M)ove Record: {MoveRecString.get(dataCollectionMoveRecord)}"+("\nSwap Target (B)ot" if botVbotBoolean else "")+"\n(Q)uit")
         command=input("\nEnter your command: ")
         parsedCommands=settingsParseBatch(command)
 
@@ -864,7 +999,7 @@ def setAutomation(val):
                         if ((not botVbotBoolean) and primaryBot.collectionDiscardInterval>=int(ii)):
                             print("NOTE: If Data Discard Interval is equal to or greater than the number of rounds played in a game, then it WON'T AFFECT THE DATA")
                     else:
-                        print("Error: The Training Duration can not be a non-positive number")
+                        print()
                 else:
                     print("Error: input is not in integer format")
             elif i[0].lower()=='a': #Sets the automated trainer algorithm NOTE: This and loading are the only times that the trainer's __init__() is called. Otherwise, the called function is the user created initializer
@@ -983,7 +1118,7 @@ def setBotRefresh(val):
                     botRefreshCycleBoolean=not botRefreshCycleBoolean
                 targetBot.botRefreshCyclePeriod=abs(targetBot.botRefreshCyclePeriod) if eval("botRefreshCycleBoolean"+differ) else -1*abs(targetBot.botRefreshCyclePeriod)
                 print("Bot Refreshing is now "+ ("ON" if eval("botRefreshCycleBoolean"+differ) else "OFF"))
-            elif i[0].lower()=='p': ##Set refresh period
+            elif i[0].lower()=='p': #Set refresh period
                 ii=settingsParseInt(i)
                 if ii.isdigit():
                     if int(ii)>0:
@@ -1127,6 +1262,7 @@ def fileExplorer(readWriteMode):
             if i[0].lower()=='v': #Prints the contents of a file
                 ii=i[1:].strip()
                 try:
+                    MoveRecString={0:"OFF",1:"Single line",2:"Columns",3:"Running Total"}
                     index=daList.index(ii)
                     daData=open(getcwd()+"\\RPSbotWD\\RPSbotSaves\\"+daList[index]+".txt","r")
                     print(f"Automated Trainer Algorithm: {daData.readline()[:-1]}")
@@ -1137,13 +1273,17 @@ def fileExplorer(readWriteMode):
                     print(f"Bot Versus Bot Mode Enabled: {('False' if k<=0 else 'True')}")
                     print(f"Number of Rounds: {abs(k)}")
                     print(f"Data Collection enabled: {daData.readline()[:-1]}")
-                    print(f"Discard Interval: {daData.readline()[:-1]}\nNumber of Games: {daData.readline()[:-1]}")
+                    print(f"Discard Interval: {daData.readline()[:-1]}\nNumber of Games: {daData.readline()[:-1]}\nDelimiter: {daData.readline()[:-1]}")
+                    print(f"Splits: {daData.readline()[:-1]}")
+                    print(f"Move Recorder: {MoveRecString.get(int(daData.readline()[:-1]))}")
                     k=int(daData.readline()[:-1])
                     print(f"Bot Refresh Enabled: {('False' if k<=0 else 'True')}")
                     print(f"Refresh Period: {abs(k)}")
                     print(f"Layer 1 Hidden State Size: {daData.readline()[:-1]}\nLayer 2 Hidden State Size: {daData.readline()[:-1]}\n"+
-                          f"Memory Length: {daData.readline()[:-1]}\nLoss Metric: {metrics.get(int(daData.readline()[:-1]))}")
-                    print(f"Memory Type: {('Change' if daData.readline()[0]=='1' else 'Move')}\n")
+                          f"Memory Length: {daData.readline()[:-1]}")
+                    k=(daData.readline()[:-1])
+                    print(f"Memory Type: {('Change' if k[0]=='1' else 'Move')}")
+                    print(f"Loss Metric: {metrics.get(int(daData.readline()))}\n")
                 except ValueError as error:
                     print(f"Error: {ii} does not exist")
             elif i[0].lower()=='c': #Chooses a file to save/load. Note that some functionality from the save/load functions has been copied here. This is a useability feature. Aborting saves/loads should not exit this menu
@@ -1212,7 +1352,7 @@ def saveParams(local):
     global initer
     local=local.strip()
     validity=0
-    for iii in local:##Tests for illegal characters in file name. Note that relative pathes are not allowed, because why bother? Relative pathes would also break fileExplorer()
+    for iii in local:#Tests for illegal characters in file name. Note that relative pathes are not allowed, because why bother? Relative pathes would also break fileExplorer()
         test=(iii.isalpha() or iii.isdigit() or iii=='-' or iii=='.' or iii=='_')
         if not test:
             validity=1
@@ -1246,6 +1386,9 @@ def saveParams(local):
     f.write(str(targetBot.dataCollection)+'\n')
     f.write(str(targetBot.collectionDiscardInterval)+'\n')
     f.write(str(numberOfGames)+'\n')
+    f.write(Deliminator+'\n')
+    f.write(str(dataCollectionSplits)+'\n')
+    f.write(str(dataCollectionMoveRecord)+'\n')
     f.write(str(targetBot.botRefreshCyclePeriod)+'\n')
     f.write(str(targetBot.layer1hiddenStateSize)+'\n')
     f.write(str(targetBot.layer2hiddenStateSize)+'\n')
@@ -1256,15 +1399,24 @@ def saveParams(local):
     if(not initer):
         print(f"Successfully saved {('primary bot' if targetBot==primaryBot else 'secodary bot')}\'s parameters to {local}.txt")
 
+def loadVarification(loaddedValue, booleanEqu, errorMessage):
+    if booleanEqu(loaddedValue):
+        return loaddedValue
+    else:
+        print(errorMessage)
+        raise ValueError()
+
 ##Loads the parameters from the save file to the target bot.
 ##local=file name to load from. No file extension, and NO RELATIVE PATHES
 ##Returns: Nothing. Returns used to escape.
 ##Globals used: initer. (a boolean for skipping prints on initial data load/save). All parameter ones. This is a load function, so it reads a lot of data.
+##NOTE: This function does NOT validate parameters beyond basic type checking. This is an error that should definitly be fixed as some point...
 def loadParams(local):
     global targetBot
     global botRefreshCycleBoolean, automationBoolean
     global botRefreshCycleBooleanSec, automationBooleanSec
     global dataCollection, numberOfGames, botVbotBoolean
+    global Deliminator, dataCollectionSplits, dataCollectionMoveRecord
     local=local.strip()
     goMenu=None
     if(len(local)==0): #If no file name was given, run fileExplorer() in LOAD mode.
@@ -1289,58 +1441,90 @@ def loadParams(local):
                 setType=1
         if((not botVbotBoolean) or setType==1):
             setGlobals=True
+        try:    
+            if getTrainer((f.readline()[:-1]))==0:#loads in the trainer
+                print("Error: invalid Trainer Algorithm")
+                raise ValueError()
+            targetBot.automationTrainingDuration=loadVarification(int(f.readline()[:-1]), lambda x: x!=0,
+                                                                  "Error: Invalid Training Duration. The Training Duration can not be zero")
+            if(targetBot.automationTrainingDuration<=0):
+                if(targetBot==primaryBot):
+                    automationBoolean=False
+                else:
+                    automationBooleanSec=False
+            else:
+                if(targetBot==primaryBot):
+                    automationBoolean=True
+                else:
+                    automationBooleanSec=True
+            if(setGlobals): #The loads for globals
+                primaryBot.botVbotDuration=loadVarification(int(f.readline()[:-1]), lambda x: x!=0,
+                                                            "Error: Invalid Bot Versus Bot mode number of rounds. It can not be zero")
+                secondaryBot.botVbotDuration=primaryBot.botVbotDuration
+                if(primaryBot.botVbotDuration>0):
+                    botVbotBoolean=True
+                else:
+                    botVbotBoolean=False
+                dataCollection=f.readline()[0]=="T"
+                if(not automationBoolean and not botVbotBoolean and dataCollection):
+                    dataCollection=False
+                    print("WARNING: Data Collection was saved as \"True\" in an impossible state. Setting Data Collection to \"False\"")
+                primaryBot.dataCollection=dataCollection
+                secondaryBot.dataCollection=dataCollection
+                primaryBot.collectionDiscardInterval=loadVarification(int(f.readline()[:-1]), lambda x: x>=0,
+                                                                      "Error: Invalid Data Discard Interval. Discard Interval must be greater than or equal to 0")
+                numberOfGames=loadVarification(int(f.readline()[:-1]), lambda x: x>0,
+                                               "Error: Invalid number of games. This value must be greater than 0")
+                Deliminator=loadVarification(f.readline()[:-1],lambda x: len(x)>1 and (x[0]=='\'' and x[1:].find('\'')==len(x)-2 ) or (x[0]=="\"" and x[1:].find("\"")==len(x)-2),
+                                             "Error: Delimiter was not saved with the correct formatting")
+                primaryBot.delimiter=Deliminator[1:-1]
+                secondaryBot.delimiter=primaryBot.delimiter
+                dataCollectionSplits=loadVarification(int(f.readline()[:-1]), lambda x: x>=0,
+                                                                      "Error: Invalid Splits length. This value must be greater than or equal to 0")
+                dataCollectionMoveRecord=loadVarification(int(f.readline()[:-1]), lambda x: x>=0 and x<4,
+                                                                      "Error: Invalid Move Records mode. The valid values are 0, 1, 2, or 3.")
+            else: #If not loading globals, consume the lines containing their data from the stream
+                f.readline()
+                f.readline()
+                f.readline()
+                f.readline()
+                f.readline()
+                f.readline()
+                f.readline()
+            targetBot.botRefreshCyclePeriod=loadVarification(int(f.readline()[:-1]), lambda x: x!=0,
+                                                            "Error: Invalid Bot Refresh period. The period cannot be zero")
+            if(targetBot.botRefreshCyclePeriod<=0):
+                if(targetBot==primaryBot):
+                    botRefreshCycleBoolean=False
+                else:
+                    botRefreshCycleBooleanSec=False
+            else:
+                if(targetBot==primaryBot):
+                    botRefreshCycleBoolean=True
+                else:
+                    botRefreshCycleBooleanSec=True
+            targetBot.layer1hiddenStateSize=loadVarification(int(f.readline()[:-1]), lambda x: x>0,
+                                               "Error: Invalid Layer size. This value must be greater than 0")
+            targetBot.layer2hiddenStateSize=loadVarification(int(f.readline()[:-1]), lambda x: x>0,
+                                               "Error: Invalid Layer size. This value must be greater than 0")
+            targetBot.memoryLength=loadVarification(int(f.readline()[:-1]), lambda x: x>0,
+                                               "Error: Invalid Memory Length. This value must be greater than 0")
+            targetBot.memoryType=loadVarification(int(f.readline()[:-1]), lambda x: x==0 or x==1,
+                                               "Error: Memory Type has an invalid value. It should be either 0 or 1")
+            targetBot.lossMetric=loadVarification(int(f.readline()), lambda x: x>0 and x<7,
+                                               "Error: Invalid Loss Metric value. This value must be equal to or between 0 and 6")
             
-        getTrainer((f.readline()[:-1]))##extra space is to account for quirk in getTrainer's parsing
-        targetBot.automationTrainingDuration=int(f.readline()[:-1])
-        if(targetBot.automationTrainingDuration<=0):
-            if(targetBot==primaryBot):
-                automationBoolean=False
+            f.close()
+            if(not initer):
+                if(setGlobals):
+                    print(f"Successfully loaded full settings from {local}.txt")
+                else:
+                    print(f"Successfully loaded parameters from {local}.txt and applied them to the {('primary bot' if targetBot==primaryBot else 'secodary bot')}")
+        except ValueError:
+            if not initer:
+                print(f"Error: {local} has invalid parameter values or is corrupted. This may be because the save is from an earlier, incompatable version of the program. Aborting load...")
             else:
-                automationBooleanSec=False
-        else:
-            if(targetBot==primaryBot):
-                automationBoolean=True
-            else:
-                automationBooleanSec=True
-        if(setGlobals): #The loads for globals
-            primaryBot.botVbotDuration=int(f.readline()[:-1])
-            secondaryBot.botVbotDuration=primaryBot.botVbotDuration
-            if(primaryBot.botVbotDuration>0):
-                botVbotBoolean=True
-            else:
-                botVbotBoolean=False
-            primaryBot.dataCollection=(f.readline()[0]=="T")
-            dataCollection=primaryBot.dataCollection
-            primaryBot.collectionDiscardInterval=int(f.readline()[:-1])
-            numberOfGames=int(f.readline()[:-1])
-        else: #If not loading globals, consume the lines containing their data from the stream
-            f.readline()
-            f.readline()
-            f.readline()
-            f.readline()
-        targetBot.botRefreshCyclePeriod=int(f.readline()[:-1])
-        if(targetBot.botRefreshCyclePeriod<=0):
-            if(targetBot==primaryBot):
-                botRefreshCycleBoolean=False
-            else:
-                botRefreshCycleBooleanSec=False
-        else:
-            if(targetBot==primaryBot):
-                botRefreshCycleBoolean=True
-            else:
-                botRefreshCycleBooleanSec=True
-        targetBot.layer1hiddenStateSize=int(f.readline()[:-1])
-        targetBot.layer2hiddenStateSize=int(f.readline()[:-1])
-        targetBot.memoryLength=int(f.readline()[:-1])
-        targetBot.memoryType=int(f.readline()[:-1])
-        targetBot.lossMetric=int(f.readline())
-        
-        f.close()
-        if(not initer):
-            if(setGlobals):
-                print(f"Successfully loaded full settings from {local}.txt")
-            else:
-                print(f"Successfully loaded parameters from {local}.txt and applied them to the {('primary bot' if targetBot==primaryBot else 'secodary bot')}")
+                raise Exception()
     else:
         if(not initer):
             print(f"Error: {local}.txt does not exist. Aborting load...")
@@ -1351,10 +1535,21 @@ def loadParams(local):
 ##Globals used: primaryBot, secondaryBot, dataCollection, numberOfGames,botVbotBoolean, metrics, outputQue
 def startGame(val):
     global metrics
+    intervalWarn=False #Check for if there is a potental problem with data discard interval
+    splitsAndMovePrints=False #Check if data collection is printing moves and splits to console 
     #If data discard interval is greater than the number of rounds set to be played, let user know and give them the chance to change it.
-    if (dataCollection and (primaryBot.collectionDiscardInterval>=primaryBot.botVbotDuration if botVbotBoolean else primaryBot.collectionDiscardInterval>=primaryBot.automationTrainingDuration)):
-        warning=input(("------------------------\nWARNING: Your Data Discard Interval is greater than the number of rounds data will be collected for. "+
-                 "If you run the bot, data WILL BE RECORDED. Run anyway? Enter Y for yes, N for no.\nEnter choice: ")+" ").lower()
+    if (dataCollection and (primaryBot.collectionDiscardInterval>=primaryBot.botVbotDuration if botVbotBoolean else primaryBot.collectionDiscardInterval>=abs(primaryBot.automationTrainingDuration))):
+        intervalWarn=True
+    if(dataCollection and fileName[0]=='[' and (dataCollectionSplits>0 or dataCollectionMoveRecord>0)):
+        splitsAndMovePrints=True
+
+
+    if(intervalWarn or splitsAndMovePrints):
+        intervalWarnText=(("\nWARNING: Your Data Discard Interval is greater than the number of rounds data will be collected for. "+
+                 "If you run the bot, data WILL BE RECORDED.") if intervalWarn else "")
+        splitMovesText=(("\nWARNING: You are outputting data collection to console while having splits or move recording on, which will print out a lot more info. This could slow down the "
+                         +"program significantly, and might result in data being lost in history.") if splitsAndMovePrints else "")
+        warning=input(("------------------------"+intervalWarnText+splitMovesText+"\nRun anyway? Enter Y for yes, N for no.\nEnter choice: ")+" ").lower()
         while not(warning[0]=='y' or warning[0]=='n'):
             warning=(input("Sorry, your choice is unclear. Enter Y for yes, N for no.")+" ").lower()
         if warning[0]=='n':
@@ -1366,10 +1561,10 @@ def startGame(val):
         f.write(datetime.now().strftime("%d/%m/%Y %H:%M:%S")+"\n")
         #lambda is only used in this if block, and only accepts (primaryBot,'P') and (secondaryBot,'S')
         #botPointer is the bot to pull parameters from, firstChar is the first character that will be printed for the AI vars
-        stringprint=lambda botPointer, firstChar : ("%s Training Duration: %s, Refresh: %s, First Hidden: %d, Second Hidden: %d, Memory: %d, Loss Metric: %s(%d)\n"
+        stringprint=lambda botPointer, firstChar : ("%s Training Duration: %s, Refresh: %s, First Hidden: %d, Second Hidden: %d, Memory: %d, Memory Type: %s, Loss Metric: %s(%d)\n"
                                                         %(firstChar, ('0' if botPointer.automationTrainingDuration<=0 else f'{botPointer.automationTrainingDuration}, Algorithm: {botPointer.trainerClass.___Name___()}'),
                                                         ('0' if botPointer.botRefreshCyclePeriod<=0 else f'{botPointer.botRefreshCyclePeriod}'),botPointer.layer1hiddenStateSize, botPointer.layer2hiddenStateSize,
-                                                        botPointer.memoryLength,metrics.get(botPointer.lossMetric),botPointer.lossMetric))
+                                                        botPointer.memoryLength,('Change' if botPointer.memoryType else 'Move'),metrics.get(botPointer.lossMetric),botPointer.lossMetric))
         f.write(stringprint(primaryBot,'P'))
         if botVbotBoolean:
             f.write(stringprint(secondaryBot,'S'))
@@ -1485,7 +1680,13 @@ def main():
         saveParams("default")
     except OSError as error:
         r=2
-    loadParams("default")
+    try:
+        loadParams("default")
+    except:
+        print("Error: invalid or corrupted default save. Applying fix. Some settings will be returned to factory default.\n\n==============================")
+        open(getcwd()+"\\RPSbotWD\\RPSbotSaves\\default.txt",'w').close()
+        saveParams("default")
+        loadParams("default")
     initer=False
 
     #function dictionary. Lambda is basially just an if statement, and does not actually take any input
@@ -1497,12 +1698,14 @@ def main():
            'l':loadParams,
            'b':lambda boo : 0 if not botVbotBoolean else swapTargetBot(),
            'g':startGame}
+    MoveRecString={0:"OFF",1:"Single line",2:"Columns",3:"Running Total"}
     LM=metrics.get(primaryBot.lossMetric)
     LM2=metrics.get(secondaryBot.lossMetric)
     condensedMemTypePrint=lambda tarBot: "%-27.27s"%(('Change' if tarBot.memoryType else 'Move'))
     #Cont vars are used as collapsed parameter lists. If a feature is turned off, then the parameters dictating that features behavior won't show up on the top menu.
     autoCont=f"\nTraining Duration: {smartFormatter('automationTrainingDuration','21')}\nAuto Trainer Algorithm: {smartFormatter('trainerClass.___Name___()','16')}" if (automationBoolean or (automationBooleanSec and botVbotBoolean)) else " "
-    dataCont=f"\nNumber of Games: {numberOfGames}\nData Discard Interval: {abs(primaryBot.collectionDiscardInterval)}\nOutput File Destination: {fileName}\nDelimiter: {Deliminator}" if dataCollection else " "
+    dataCont=(f"\nNumber of Games: {numberOfGames}\nData Discard Interval: {'OFF' if not primaryBot.collectionDiscardInterval else primaryBot.collectionDiscardInterval}\nOutput File Destination: {fileName}\nDelimiter: {Deliminator}"+
+    f"\nSplits: {(dataCollectionSplits if dataCollectionSplits>0 else 'OFF')}\nMove Record: {MoveRecString.get(dataCollectionMoveRecord)}") if dataCollection else " "
     refreCont=f"\nRefresh Period: {smartFormatter('botRefreshCyclePeriod','24')}" if (botRefreshCycleBoolean or (botRefreshCycleBooleanSec and botVbotBoolean)) else " "
     versusCont=f"\nNumber of Rounds: {abs(primaryBot.botVbotDuration)}" if botVbotBoolean else " "
     
@@ -1522,7 +1725,7 @@ def main():
     inn=input("\nEnter your command: ")+" " #Extra space is corner case again. Probably.
     innSplit=settingsParseBatch(inn)
     i=0
-    while innSplit[i][0]!='e': #The main loop
+    while innSplit[i][0].lower()!='e': #The main loop
         fun=refer.get(innSplit[i][0].lower())
         if(type(fun))!=type(refer.get(' ')):
             fun(innSplit[i][1:].strip())
@@ -1537,7 +1740,8 @@ def main():
             LM=metrics.get(primaryBot.lossMetric)
             LM2=metrics.get(secondaryBot.lossMetric)
             autoCont=f"\nTraining Duration: {smartFormatter('automationTrainingDuration','21')}\nAuto Trainer Algorithm: {smartFormatter('trainerClass.___Name___()','16')}" if (automationBoolean or (automationBooleanSec and botVbotBoolean)) else " "
-            dataCont=f"\nNumber of Games: {numberOfGames}\nData Discard Interval: {abs(primaryBot.collectionDiscardInterval)}\nOutput File Destination: {fileName}\nDelimiter: {Deliminator}" if dataCollection else " "
+            dataCont=(f"\nNumber of Games: {numberOfGames}\nData Discard Interval: {'OFF' if not primaryBot.collectionDiscardInterval else primaryBot.collectionDiscardInterval}\nOutput File Destination: {fileName}\nDelimiter: {Deliminator}"+
+            f"\nSplits: {(dataCollectionSplits if dataCollectionSplits>0 else 'OFF')}\nMove Record: {MoveRecString.get(dataCollectionMoveRecord)}") if dataCollection else " "
             refreCont=f"\nRefresh Period: {smartFormatter('botRefreshCyclePeriod','24')}" if (botRefreshCycleBoolean or (botRefreshCycleBooleanSec and botVbotBoolean)) else " "
             versusCont=f"\nNumber of Rounds: {abs(primaryBot.botVbotDuration)}" if botVbotBoolean else " "
             print(f"\nAuto Training Enabled: {smartFormatter('automationBoolean','17')}{autoCont}\n\nBot Versus Bot mode active: {str(botVbotBoolean)}{versusCont}\n\n"+
