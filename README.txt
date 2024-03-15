@@ -30,3 +30,18 @@ Very mild code reformatting
 Added value validation to save data loading
 
 Updated the formatting of the manual
+
+
+
+3/15/2024
+V 1.2.1
+
+Fixed Move Record so that it works when outputting to a file
+
+Changed how the Automated Trainer's class name is displayed. Now the name won't be cut off if BotVbot mode is off, and class names are always preceeded by their assigned number
+
+Added two new example RPStrainer classes to RPSuserBot.py. These classes are crude models meant to simulate human play. Data used for the bots was taken from this paper:
+Dyson, B., Wilbiks, J., Sandhu, R. et al. Negative outcomes evoke cyclic irrational decisions in Rock, Paper,
+Scissors. Sci Rep 6, 20479 (2016). https://doi.org/10.1038/srep20479 
+
+Removed a single space from the manual (and updated it to warn users about the trainers' class name being cut off when it's too long to display nicely)

@@ -659,7 +659,7 @@ class daBot():
                     self.numTies=0
                     self.numRounds=0
                     self.dataSplitsStorage=[] #Highly inefficit way to keep splits from tracking discarded data
-                    if(not self.botVbotDuration>0): #If botVbot mode, then the data discard interval hasn't happened yet
+                    if(not self.botVbotDuration>0 or self.collectionDiscardInterval==0): #If botVbot mode, then the data discard interval hasn't happened yet
                         dataDiscardMoveRecorderThing=False
                     else:
                         dataDiscardMoveRecorderThing=True
@@ -785,15 +785,20 @@ def settingsParseInt(argString):
 ##parameter=the uncompiled variable that the desired value is associated with.
 ##spacingInt=an string representing an int, used for formatting the parameters (how many characters long should the parameter be printed as)
 ##Returns: The formatted string to be printed out.
+##Globals used: botVbotBoolean, trainerDictR
 def smartFormatter(parameter, spacingInt='0'):
     if parameter=="botRefreshCycleBoolean" or parameter=="automationBoolean":
         return eval("'%-"+spacingInt+"."+spacingInt+"s%s'%(str("+parameter+"),('' if not botVbotBoolean else f'  Secondary: {str("+parameter+"Sec)}'))")
     #EVAL NOTE: spacingInt comes from a hard coded value, so it shouldn't be much of a risk. parameter is usually variable names related to the bot, EXCEPT for when it's
     #the trainerClass name. This value comes from the user written script for running the AI, and thus is semi-arbitrary
     elif parameter=="trainerClass.___Name___()":
-        return eval("'%-"+spacingInt+"."+spacingInt+"s%s'%(primaryBot."+parameter+",('' if not botVbotBoolean else f'  Secondary: {secondaryBot."+parameter+"}'))")
+        return eval("'%-"+spacingInt+"."+(spacingInt if botVbotBoolean else str(100))+"s%s'%(f'{trainerDictR.get(primaryBot."+parameter+")} '+primaryBot."+parameter+
+                    ",('' if not botVbotBoolean else f'  Secondary: {trainerDictR.get(secondaryBot."+parameter+")} {secondaryBot."+parameter+"}'))")
     else:
         return eval("'%-"+spacingInt+".d%s'%(abs(primaryBot."+parameter+"),('' if not botVbotBoolean else f'  Secondary: {abs(secondaryBot."+parameter+")}'))")
+
+trainerDict={0:"defaultTrainer"}
+trainerDictR={"defaultTrainer":0}
 
 
 dataCollectionSplits=0

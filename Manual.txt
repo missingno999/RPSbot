@@ -162,6 +162,7 @@ AUTOMATED TRAINING MENU
  ~ The Automated Trainer feature allows users to pit the AI against a custom made Rock Paper Scissors algorithm. This allows the user to test the bot's performance against a range of automated strategies. For info on how to make your own Automated Trainer, se the section "Programing an RPStrainer". For now, this section will focus on setting bot parameters and what they do.
  ~ To enable the Automated Trainer, enter E. To set the number of rounds the AI will play against the Automated trainer, enter D followed by a number. If Bot Versus Bot mode is turned off, then this variable determines how many rounds the bot will play each game in Data Collection mode. If Data collection is also turned off, then after the Training Duration is done, the user will be given the current score and allowed to pick up the game from where the Automated Trainer left off.
  ~ To set the Algorithm used by the Automated Trainer, enter A followed by either a number or the name of the trainer you want to use. When the program is started, it reads off all the functions in the file it was launched from, and stores any that are trainers in its memory. It also assigns numbers to these functions according to their apperance order. The function closest to the top gets assigned 1, the next gets assigned 2, etc. There's also a default trainer which always throws a random value as it's move. It's name is defaultTrainer and it's number is 0. You can pass either the number of the name as an argument to A. If you pass no arguments, then A will instead print out the list of trainer functions and their corrosponding numbers.
+ ~ Note that if Bot Versus Bot mode is enabled, the name of th trainer my be cut off if it is too long.
 
 E > Enable Automated Training
 D[integer] > Set the number of rounds the AI will play against the trainer
@@ -233,6 +234,7 @@ PROGRAMING AN RPStrainer
 THE RPStrainer ABSTRACT CLASS & SYNTAX
  ~ rockPaperScissorsBotV1.py contains an abstract class called "RPStrainer". All training algorithms are children of this class.
  ~ Due to how the program loads trainers, there are some very specific rules that must be followed when setting up a trainer. First, the trainer MUST be in the same python file as the one the AI is executed from. Do NOT execute the AI directly from rockPaperScissorsBotV1.py. Second, when declaring the new class, you must A) use NO unnecessary spaces B) Use RPStrainer as RPStrainer. Do NOT give RPStrainer a different name when importing. Otherwise, the main program won't load it. Next, the very first function that must be defined for the class is ___Name___(self). That's three underscores on each side. This funciton will return a string containing the name of the class exactly, of the form [return "className"]. Do NOT include comments on the first three lines of the class. All of these requirements are security measures, so please be understanding. Once you have the first three lines, the rest of the class follows normal python syntax.
+ ~ Also note that if the class name is too long, and Bot Versus Bot mode is active, then part of the class name will be cut off.
 
 ---------------------------
 THE FUNCTIONS
@@ -271,7 +273,7 @@ UTILITY:
 getChange(self, firstMove, secondMove)
 >>firstMove==int, represents the "origin" move
 >>secondMove==int, represents the "destination" move
->>RETURNS: int representing the change from the origin move to the destination move. 0=tie, 1=destination beats origin, 2= origin beats destination.
+>>RETURNS: int representing the change from the origin move to the destination move. 0=tie, 1=destination beats origin, 2=origin beats destination.
 >>>>>Description: It calculates the change between two moves. There are some loss metrics that use change to assess accuracy, so it is likely useful if your bot can calculate change as well.
 
 randThrow(self)

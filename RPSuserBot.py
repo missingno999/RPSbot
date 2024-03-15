@@ -121,4 +121,107 @@ class botChangeResponse(RPStrainer):
             self.botHistory=BotPrevMove
             return change
 
+#A trainer that acts as a crude model of human play behavior.
+#Roughly based off the data from this paper:
+##Dyson, B., Wilbiks, J., Sandhu, R. et al. Negative outcomes evoke cyclic irrational decisions in Rock, Paper, Scissors.
+##Sci Rep 6, 20479 (2016). https://doi.org/10.1038/srep20479
+class simulatedCycleBehavior(RPStrainer):
+    def ___Name___(self):
+        return "simulatedCycleBehavior"
+    def preGameAssignment(self):
+        self.curBehavior=-1 #-1 means neutral 
+    def computeMove(self, playerPrevMove, BotPrevMove, outcome):
+        hold=0
+        upgrade=0
+        downgrade=0
+        if(outcome==1):
+            hold=0.36
+            upgrade=0.31
+            downgrade=0.33
+        elif self.curBehavior==-1:
+            if(outcome==0):
+                hold=0.26
+                upgrade=0.43
+                downgrade=0.31
+            else:
+                hold=0.22
+                upgrade=0.36
+                downgrade=0.42
+        else:
+            if self.curBehavior==0:
+                hold=0.29
+                upgrade=0.35
+                downgrade=0.36
+            if self.curBehavior==1:
+                hold=0.30
+                upgrade=0.40
+                downgrade=0.30
+            if self.curBehavior==2:
+                hold=0.30
+                upgrade=0.30
+                downgrade=0.40            
+        jk=random.random()
+        if jk<=hold:
+            self.curBehavior=0
+            return playerPrevMove
+        if jk<=(hold+upgrade):
+            self.curBehavior=1
+            return (playerPrevMove+1)%3
+        else:
+            self.curBehavior=2
+            return (playerPrevMove+2)%3
+
+#The exact same idea as the previous one, except with exaggerated probabilities (making it more predictable)
+class simulatedCycleBehaviorExag(RPStrainer):
+    def ___Name___(self):
+        return "simulatedCycleBehaviorExag"
+    def preGameAssignment(self):
+        self.curBehavior=-1 #-1 means neutral 
+    def computeMove(self, playerPrevMove, BotPrevMove, outcome):
+        hold=0
+        upgrade=0
+        downgrade=0
+        if(outcome==1):
+            hold=0.33
+            upgrade=0.33
+            downgrade=0.33
+        elif self.curBehavior==-1:
+            if(outcome==0):
+                hold=0.14
+                upgrade=0.55
+                downgrade=0.31
+            else:
+                hold=0.09
+                upgrade=0.36
+                downgrade=0.55
+        else:
+            if self.curBehavior==0:
+                hold=0.19
+                upgrade=0.40
+                downgrade=0.41
+            if self.curBehavior==1:
+                hold=0.17
+                upgrade=0.53
+                downgrade=0.20
+            if self.curBehavior==2:
+                hold=0.18
+                upgrade=0.20
+                downgrade=0.52            
+        jk=random.random()
+        if jk<=hold:
+            self.curBehavior=0
+            return playerPrevMove
+        if jk<=(hold+upgrade):
+            self.curBehavior=1
+            return (playerPrevMove+1)%3
+        else:
+            self.curBehavior=2
+            return (playerPrevMove+2)%3
+
+#>bot tracks opponent's moves
+#>Plays random moves, adjusted for frequency
+#>IF the bot notices a pattern in the opponent's moves, it attempts to exploit it
+#>PATTER: 
+
+
 main()
