@@ -5,7 +5,7 @@ This text file is the user manual for rockPaperScissorsBotV1.py. Here you'll fin
 
 ========================
 RUNNING THE PROGRAM
- ~ This program is intended to be ran from a seperate python script. Just create a python file, import rockPaperScissorsBotV1.py, and call main(). Also make sure you have pytorch installed, as it's a required library. If done correctly, the bot should print "importing", and after a moment, it will bring up the Top menu.
+ ~ This program is intended to be ran from a seperate python script. Just create a python file, import rockPaperScissorsBotV1.py, and call main(). Also make sure you have PyTorch installed (see PyTorch website (https://pytorch.org/)), as it's a required library. If done correctly, the bot should print "importing", and after a moment, it will bring up the Top menu.
 
 ========================
 THE SETTINGS MENUS' INTERFACE

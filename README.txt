@@ -45,3 +45,10 @@ Dyson, B., Wilbiks, J., Sandhu, R. et al. Negative outcomes evoke cyclic irratio
 Scissors. Sci Rep 6, 20479 (2016). https://doi.org/10.1038/srep20479 
 
 Removed a single space from the manual (and updated it to warn users about the trainers' class name being cut off when it's too long to display nicely)
+
+3/29/2020
+V 1.2.1B
+
+Didn't change the code, just added a quick start guide
+
+Also added to the manual a link to the PyTorch website for installing

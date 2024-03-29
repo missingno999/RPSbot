@@ -1,0 +1,8 @@
+>Make sure PyTorch is installed (check pytorch website (https://pytorch.org/))
+>Run RPSuserBot.py (ideally in IDLE)
+>Wait for the AI to load, and for the program to prompt for input.
+>Type G and hit enter. This will start a game with the AI
+>RULES:
+Enter R for rock, P for paper, and S for scissors. To end the game, enter 'exit'.
+
+This is the most basic functionality of this program. Other options include training the AI agaist a simulated opponent, altering the behavior of the AI to see what makes it smarter or more adapted to certain opponents, have two AI's go against each other, and features for scientific data collection. Please refer to the Manual for details on all the program's featuers.
